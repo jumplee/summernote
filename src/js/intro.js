@@ -1,9 +1,9 @@
 /**
- * Super simple wysiwyg editor on Bootstrap v@VERSION
- * http://hackerwins.github.io/summernote/
+ * Super simple wysiwyg editor v@VERSION
+ * http://summernote.org/
  *
  * summernote.js
- * Copyright 2013 Alan Hong. and outher contributors
+ * Copyright 2013- Alan Hong. and other contributors
  * summernote may be freely distributed under the MIT license./
  *
  * Date: @DATE
@@ -12,10 +12,13 @@
   /* global define */
   if (typeof define === 'function' && define.amd) {
     // AMD. Register as an anonymous module.
-    define(['jquery', 'codemirror'], factory);
+    define(['jquery'], factory);
+  } else if (typeof module === 'object' && module.exports) {
+    // Node/CommonJS
+    module.exports = factory(require('jquery'));
   } else {
-    // Browser globals: jQuery, CodeMirror
-    factory(window.jQuery, window.CodeMirror);
+    // Browser globals
+    factory(window.jQuery);
   }
-}(function ($, CodeMirror) {
+}(function ($) {
   'use strict';

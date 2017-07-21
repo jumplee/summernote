@@ -17,6 +17,59 @@ module.exports = function (grunt) {
     return data;
   };
 
+  var customLaunchers = {
+    /*
+    'SL_IE8': {
+      base: 'SauceLabs',
+      browserName: 'internet explorer',
+      version: '8.0',
+      platform: 'windows XP'
+    },
+    */
+    'SL_IE9': {
+      base: 'SauceLabs',
+      browserName: 'internet explorer',
+      version: '9.0',
+      platform: 'windows 7'
+    },
+    'SL_IE10': {
+      base: 'SauceLabs',
+      browserName: 'internet explorer',
+      version: '10.0',
+      platform: 'windows 8'
+    },
+    'SL_IE11': {
+      base: 'SauceLabs',
+      browserName: 'internet explorer',
+      version: '11.0',
+      platform: 'windows 8.1'
+    },
+    'SL_EDGE': {
+      base: 'SauceLabs',
+      browserName: 'microsoftedge',
+      version: 'latest',
+      platform: 'windows 10'
+    },
+    'SL_CHROME': {
+      base: 'SauceLabs',
+      browserName: 'chrome',
+      version: '59',
+      platform: 'windows 8'
+    },
+    'SL_FIREFOX': {
+      base: 'SauceLabs',
+      browserName: 'firefox',
+      version: '54',
+      platform: 'windows 8'
+    },
+    'SL_SAFARI': {
+      base: 'SauceLabs',
+      browserName: 'safari',
+      version: '8.0',
+      platform: 'OS X 10.10'
+    }
+  };
+
   grunt.initConfig({
     // package File
     pkg: grunt.file.readJSON('package.json'),
@@ -35,7 +88,13 @@ module.exports = function (grunt) {
     jshint: {
       all: {
         src: [
-          'src/**/*.js', 'Gruntfile.js', 'test/**/*.js', 'build/*.js'
+          'src/**/*.js',
+          'plugin/**/*.js',
+          'lang/**/*.js',
+          'Gruntfile.js',
+          'test/**/*.js',
+          '!test/coverage/**/*.js',
+          'build/*.js'
         ],
         options: {
           jshintrc: true
@@ -47,15 +106,35 @@ module.exports = function (grunt) {
       }
     },
 
-    // qunit: javascript unit test.
-    qunit: {
-      all: [ 'test/*.html' ]
+    jscs: {
+      src: ['*.js', 'src/**/*.js', 'test/**/*.js', 'plugin/**/*.js'],
+      gruntfile: 'Gruntfile.js',
+      build: 'build'
     },
 
     // uglify: minify javascript
     uglify: {
+      options: {
+        banner: '/*! Summernote v<%=pkg.version%> | (c) 2013- Alan Hong and other contributors | MIT license */\n'
+      },
       all: {
-        files: { 'dist/summernote.min.js': ['dist/summernote.js'] }
+        files: [
+          { 'dist/summernote.min.js': ['dist/summernote.js'] },
+          {
+            expand: true,
+            cwd: 'dist/lang',
+            src: '**/*.js',
+            dest: 'dist/lang',
+            ext: '.min.js'
+          },
+          {
+            expand: true,
+            cwd: 'dist/plugin',
+            src: '**/*.js',
+            dest: 'dist/plugin',
+            ext: '.min.js'
+          }
+        ]
       }
     },
 
@@ -63,9 +142,43 @@ module.exports = function (grunt) {
     recess: {
       dist: {
         options: { compile: true, compress: true },
-        files: {
-          'dist/summernote.css': ['src/less/summernote.less']
-        }
+        files: [
+          {
+            'dist/summernote.css': ['src/less/summernote.less']
+          },
+          {
+            expand: true,
+            cwd: 'dist/plugin',
+            src: '**/*.css',
+            dest: 'dist/plugin',
+            ext: '.min.css'
+          }
+        ]
+      }
+    },
+
+    // compress: summernote-{{version}}-dist.zip
+    compress: {
+      main: {
+        options: {
+          archive: function () {
+            return 'dist/summernote-{{version}}-dist.zip'.replace(
+              '{{version}}',
+              grunt.config('pkg.version')
+            );
+          }
+        },
+        files: [{
+          expand: true,
+          src: [
+            'dist/*.js',
+            'dist/*.css',
+            'dist/font/*'
+          ]
+        }, {
+          src: ['plugin/**/*.js', 'plugin/**/*.css', 'lang/**/*.js'],
+          dest: 'dist/'
+        }]
       }
     },
 
@@ -73,17 +186,7 @@ module.exports = function (grunt) {
     connect: {
       all: {
         options: {
-          port: 3000,
-          livereload: true,
-          middleware: function (connect, options, middlewares) {
-            middlewares = middlewares || [];
-            return middlewares.concat([
-              require('connect-livereload')(), // livereload middleware
-              connect['static'](options.base),    // serve static files
-              connect.directory(options.base)  // make empty directories browsable
-            ]);
-          },
-          open: 'http://localhost:3000'
+          port: 3000
         }
       }
     },
@@ -91,30 +194,126 @@ module.exports = function (grunt) {
     // watch source code change
     watch: {
       all: {
-        files: ['src/less/*.less', 'src/js/**/*.js'],
-        tasks: ['recess', 'jshint', 'qunit'],
+        files: ['src/less/*.less', 'src/js/**/*.js', 'test/unit/**/*.js'],
+        tasks: ['recess', 'lint'],
         options: {
           livereload: true
+        }
+      }
+    },
+
+    // Meteor commands to test and publish package
+    exec: {
+      'meteor-test': {
+        command: 'meteor/runtests.sh'
+      },
+      'meteor-publish': {
+        command: 'meteor/publish.sh'
+      }
+    },
+
+    karma: {
+      options: {
+        configFile: './test/karma.conf.js'
+      },
+      all: {
+        // Chrome, ChromeCanary, Firefox, Opera, Safari, PhantomJS, IE
+        singleRun: true,
+        browsers: ['PhantomJS'],
+        reporters: ['progress']
+      },
+      dist: {
+        singleRun: true,
+        browsers: ['PhantomJS']
+      },
+      travis: {
+        singleRun: true,
+        browsers: ['PhantomJS'],
+        reporters: ['progress', 'coverage']
+      },
+      saucelabs: {
+        reporters: ['saucelabs'],
+        sauceLabs: {
+          testName: '[Travis] unit tests for summernote',
+          startConnect: false,
+          tunnelIdentifier: process.env.TRAVIS_JOB_NUMBER,
+          build: process.env.TRAVIS_BUILD_NUMBER,
+          tags: [process.env.TRAVIS_BRANCH, process.env.TRAVIS_PULL_REQUEST]
+        },
+        captureTimeout: 120000,
+        customLaunchers: customLaunchers,
+        browsers: Object.keys(customLaunchers),
+        singleRun: true
+      }
+    },
+
+    coveralls: {
+      options: {
+        force: false
+      },
+      travis: {
+        src: 'test/coverage/**/lcov.info'
+      }
+    },
+    clean: {
+      dist: ['dist/**/*']
+    },
+    copy: {
+      dist: {
+        files: [
+          { src: 'lang/*', dest: 'dist/' },
+          { src: 'plugin/**/*', dest: 'dist/' },
+          { expand: true, cwd: 'src/icons/dist/font/', src: ['**', '!*.html'], dest: 'dist/font/' },
+          { src: 'src/icons/dist/summernote.css', dest: 'src/icons/dist/summernote.less' }
+        ]
+      }
+    },
+    webfont: {
+      icons: {
+        src: 'src/icons/*.svg',
+        dest: 'src/icons/dist/font',
+        destCss: 'src/icons/dist/',
+        options: {
+          font: 'summernote',
+          template: 'src/icons/templates/summernote.css'
         }
       }
     }
   });
 
-  // load grunt tasks on package.json.
+  // load all tasks from the grunt plugins used in this file
   require('load-grunt-tasks')(grunt);
 
-  // server
+  // load all grunts/*.js
+  grunt.loadTasks('grunts');
+
+  // server: run server for development
   grunt.registerTask('server', ['connect', 'watch']);
 
-  // build: build summernote.js
-  grunt.loadTasks('build');
+  // lint
+  grunt.registerTask('lint', ['jshint', 'jscs']);
 
   // test: unit test on test folder
-  grunt.registerTask('test', ['jshint', 'qunit']);
+  grunt.registerTask('test', ['lint', 'karma:all']);
 
-  // dist
-  grunt.registerTask('dist', ['build', 'test', 'uglify', 'recess']);
+  // test: unit test on travis
+  grunt.registerTask('test-travis', ['lint', 'karma:travis']);
 
-  // default: build, test, dist.
-  grunt.registerTask('default', ['dist']);
+  // test: saucelabs test
+  grunt.registerTask('saucelabs-test', ['karma:saucelabs']);
+
+  // dist: make dist files
+  grunt.registerTask('dist', [
+    'clean:dist',
+    'build', 'webfont', 'lint', 'karma:dist',
+    'copy:dist', 'uglify', 'recess', 'compress'
+  ]);
+
+  // default: server
+  grunt.registerTask('default', ['server']);
+
+  // Meteor tasks
+  grunt.registerTask('meteor-test', 'exec:meteor-test');
+  grunt.registerTask('meteor-publish', 'exec:meteor-publish');
+  grunt.registerTask('meteor', ['meteor-test', 'meteor-publish']);
 };
